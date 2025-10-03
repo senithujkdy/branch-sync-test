@@ -1,0 +1,21 @@
+name: Check Branch Up-to-Date
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  check-updated:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Check if branch is up to date with main
+        run: |
+          git fetch origin main
+          behind=$(git rev-list --count HEAD..origin/main)
+          if [ "$behind" -gt 0 ]; then
+            echo "::error::Branch is $behind commits behind main. Please merge main into your branch."
+            exit 1
+          fi
