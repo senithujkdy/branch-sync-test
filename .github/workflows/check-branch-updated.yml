@@ -1,0 +1,61 @@
+name: Check Branch Status
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  
+jobs:
+  check-branch-updated:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Fetch main branch
+        run: |
+          git fetch origin main:main
+          
+      - name: Check if branch is up-to-date with main
+        run: |
+          # Get the merge base between current branch and main
+          merge_base=$(git merge-base HEAD main)
+          main_head=$(git rev-parse main)
+          
+          if [ "$merge_base" != "$main_head" ]; then
+            commits_behind=$(git rev-list --count $merge_base..main)
+            echo "❌ ERROR: This branch is $commits_behind commit(s) behind main"
+            echo ""
+            echo "Please update your branch by running:"
+            echo "  git checkout ${{ github.head_ref }}"
+            echo "  git pull origin main"
+            echo ""
+            echo "Or merge main into your branch:"
+            echo "  git merge origin/main"
+            exit 1
+          else
+            echo "✅ Branch is up-to-date with main"
+          fi
+          
+      - name: Check for merge conflicts
+        if: success()
+        run: |
+          # Try a test merge to detect conflicts
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          
+          if ! git merge --no-commit --no-ff main; then
+            echo "❌ ERROR: This branch has merge conflicts with main"
+            echo ""
+            echo "Please resolve conflicts locally:"
+            echo "  git checkout ${{ github.head_ref }}"
+            echo "  git merge origin/main"
+            echo "  # Resolve conflicts"
+            echo "  git commit"
+            git merge --abort
+            exit 1
+          else
+            echo "✅ No merge conflicts detected"
+            git merge --abort
+          fi
